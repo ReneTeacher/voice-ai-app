@@ -1,0 +1,28 @@
+{
+  "name": "voice-ai-app",
+  "version": "1.0.0",
+  "main": "dist-electron/main.js",
+  "author": "Teacher",
+  "license": "MIT",
+  "build": {
+    "appId": "com.voiceai.app",
+    "productName": "Voice AI",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "linux": {
+      "target": ["AppImage"]
+    }
+  }
+}
