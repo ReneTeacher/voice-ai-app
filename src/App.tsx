@@ -32,22 +32,32 @@ function App() {
     setState(prev => ({ ...prev, apiKey: savedKey }))
   }, [])
 
-  // Check whisper server status
+  // Check whisper server status - poll every 2 seconds
   useEffect(() => {
-    // @ts-ignore
     const checkStatus = async () => {
-      // @ts-ignore
-      if (window.electronAPI?.getWhisperStatus) {
-        // Wait a bit for server to start
-        setTimeout(() => {
+      try {
+        const response = await fetch('http://localhost:5001/health', {
+          method: 'GET'
+        })
+        if (response.ok) {
           setState(prev => ({ ...prev, whisperStatus: 'ready' }))
-        }, 3000)
-      } else {
-        // Running in browser, assume ready
-        setState(prev => ({ ...prev, whisperStatus: 'ready' }))
+        } else {
+          setState(prev => ({ ...prev, whisperStatus: 'error' }))
+        }
+      } catch {
+        // Server not ready yet
+        setState(prev => { 
+          // Only update if not already ready (avoid flickering)
+          if (prev.whisperStatus === 'ready') return prev;
+          return { ...prev, whisperStatus: 'starting' }
+        })
       }
     }
+
+    // Check immediately, then poll every 2 seconds
     checkStatus()
+    const interval = setInterval(checkStatus, 2000)
+    return () => clearInterval(interval)
   }, [])
 
   // Listen for global shortcut trigger

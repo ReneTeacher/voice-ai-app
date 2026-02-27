@@ -14,7 +14,12 @@ app = Flask(__name__)
 # 可選: tiny, base, small, medium, large-v2, large-v3
 print("Loading Whisper model...")
 model = WhisperModel("small", device="cpu", compute_type="int8")
-print("Model loaded! Server ready at http://localhost:5000")
+print("Model loaded! Server ready at http://localhost:5001")
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check endpoint"""
+    return jsonify({'status': 'ok', 'model': 'ready'}), 200
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():

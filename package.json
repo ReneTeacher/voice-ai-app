@@ -37,7 +37,8 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "whisper_server.py"
     ],
     "mac": {
       "target": ["dmg"],

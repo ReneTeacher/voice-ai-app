@@ -8,26 +8,40 @@ let whisperProcess;
 // Check if running in development
 const isDev = process.env.NODE_ENV === 'development';
 
-// Find the venv python
-function getPythonPath() {
-  // Try to find venv python first
-  const venvPath = path.join(__dirname, '..', 'venv', 'bin', 'python3');
-  if (fs.existsSync(venvPath)) {
-    return venvPath;
-  }
-  // Fallback to system python
-  return 'python3';
-}
+// Find the venv python - DEPRECATED since we need system python
+// Keeping for reference but not used in packaged app
 
 function startWhisperServer() {
   console.log('Starting Whisper server...');
   
-  const pythonPath = getPythonPath();
-  const scriptPath = path.join(__dirname, '..', 'whisper_server.py');
+  // Determine the correct path for the script
+  let scriptPath;
+  let workingDir;
+  
+  if (app.isPackaged) {
+    // Running from packaged app
+    scriptPath = path.join(process.resourcesPath, 'app', 'whisper_server.py');
+    workingDir = path.join(process.resourcesPath, 'app');
+  } else {
+    // Running in development
+    scriptPath = path.join(__dirname, '..', 'whisper_server.py');
+    workingDir = path.join(__dirname, '..');
+  }
+  
+  console.log('Script path:', scriptPath);
+  console.log('Working dir:', workingDir);
+  
+  // Try different python commands
+  const pythonCommands = ['python3', 'python', 'pip3'];
+  let pythonPath = null;
+  
+  // For now, try python3
+  pythonPath = 'python3';
   
   whisperProcess = spawn(pythonPath, [scriptPath], {
-    cwd: path.join(__dirname, '..'),
-    stdio: 'pipe'
+    cwd: workingDir,
+    stdio: 'pipe',
+    env: { ...process.env }
   });
 
   whisperProcess.stdout.on('data', (data) => {
