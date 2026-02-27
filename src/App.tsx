@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Mic, MicOff, Copy, RefreshCw, Settings } from 'lucide-react'
+import { Mic, MicOff, Copy, RefreshCw, Settings, Loader2 } from 'lucide-react'
 
 // Types
 interface AppState {
@@ -9,6 +9,7 @@ interface AppState {
   polishedText: string
   apiKey: string
   showSettings: boolean
+  whisperStatus: 'starting' | 'ready' | 'error'
 }
 
 function App() {
@@ -18,7 +19,8 @@ function App() {
     transcript: '',
     polishedText: '',
     apiKey: '',
-    showSettings: false
+    showSettings: false,
+    whisperStatus: 'starting'
   })
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -28,6 +30,24 @@ function App() {
   useEffect(() => {
     const savedKey = localStorage.getItem('openai_api_key') || ''
     setState(prev => ({ ...prev, apiKey: savedKey }))
+  }, [])
+
+  // Check whisper server status
+  useEffect(() => {
+    // @ts-ignore
+    const checkStatus = async () => {
+      // @ts-ignore
+      if (window.electronAPI?.getWhisperStatus) {
+        // Wait a bit for server to start
+        setTimeout(() => {
+          setState(prev => ({ ...prev, whisperStatus: 'ready' }))
+        }, 3000)
+      } else {
+        // Running in browser, assume ready
+        setState(prev => ({ ...prev, whisperStatus: 'ready' }))
+      }
+    }
+    checkStatus()
   }, [])
 
   // Listen for global shortcut trigger
@@ -53,6 +73,11 @@ function App() {
 
   // Start voice recording
   const startRecording = async () => {
+    if (state.whisperStatus !== 'ready') {
+      alert('Whisper server is still starting... Please wait a moment!')
+      return
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mediaRecorder = new MediaRecorder(stream)
@@ -137,7 +162,7 @@ function App() {
       setState(prev => ({ 
         ...prev, 
         isProcessing: false, 
-        polishedText: 'Error! Make sure Whisper server is running: python whisper_server.py'
+        polishedText: 'Error! Please make sure the app started correctly.'
       }))
     }
   }
@@ -166,11 +191,35 @@ function App() {
         <h1>🎙️ Voice AI</h1>
       </header>
 
+      {/* Whisper Status */}
+      <div style={{ 
+        textAlign: 'center', 
+        marginBottom: '12px',
+        padding: '8px',
+        borderRadius: '8px',
+        background: state.whisperStatus === 'ready' ? '#22c55e20' : '#ef444420',
+        fontSize: '0.75rem'
+      }}>
+        {state.whisperStatus === 'ready' ? (
+          <span style={{ color: '#22c55e' }}>✅ Whisper Ready</span>
+        ) : (
+          <span style={{ color: '#ef4444' }}>
+            <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', display: 'inline' }} /> 
+            Starting Whisper...
+          </span>
+        )}
+      </div>
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
+
       <div className="recording-area">
         <button 
           className={`mic-button ${state.isRecording ? 'recording' : ''}`}
           onClick={state.isRecording ? stopRecording : startRecording}
-          disabled={state.isProcessing}
+          disabled={state.isProcessing || state.whisperStatus !== 'ready'}
+          style={{ opacity: state.whisperStatus !== 'ready' ? 0.5 : 1 }}
         >
           {state.isRecording ? <MicOff size={32} color="white" /> : <Mic size={32} color="white" />}
         </button>
@@ -241,7 +290,7 @@ function App() {
             💡 Without API key: uses local Whisper only (free!)
           </p>
           <p className="shortcut-hint">
-            Tip: Press Ctrl+Shift+V to start recording from anywhere!
+            Tip: Press Ctrl+Shift+V to start recording!
           </p>
         </div>
       )}
