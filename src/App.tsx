@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Mic, MicOff, Copy, RefreshCw, Settings, Check } from 'lucide-react'
+import { Mic, MicOff, Copy, RefreshCw, Settings } from 'lucide-react'
 
 // Types
 interface AppState {
@@ -87,89 +87,59 @@ function App() {
     }
   }
 
-  // Process audio with Whisper + GPT
+  // Process audio with LOCAL Whisper + optional GPT polish
   const processAudio = async (audioBlob: Blob) => {
-    if (!state.apiKey) {
-      setState(prev => ({ 
-        ...prev, 
-        isProcessing: false, 
-        polishedText: 'Please set your OpenAI API key in settings first!'
-      }))
-      return
-    }
-
     try {
-      // Convert audio to base64
-      const reader = new FileReader()
-      const audioBase64 = await new Promise<string>((resolve) => {
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(',')[1]
-          resolve(base64)
-        }
-        reader.readAsDataURL(audioBlob)
+      // Send to local Whisper server
+      const formData = new FormData()
+      formData.append('audio', audioBlob, 'recording.webm')
+
+      const whisperResponse = await fetch('http://localhost:5000/transcribe', {
+        method: 'POST',
+        body: formData
       })
 
-      // Call Whisper API
-      const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${state.apiKey}`,
-        },
-        body: createFormData(audioBase64)
-      })
+      if (!whisperResponse.ok) {
+        throw new Error('Whisper server not running')
+      }
 
       const whisperData = await whisperResponse.json()
       const transcript = whisperData.text || ''
 
       setState(prev => ({ ...prev, transcript }))
 
-      // Polish with GPT
-      const polishResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${state.apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          { 
-              role messages: [
-           : 'system', 
-              content: 'You are a professional editor. Clean up the transcribed text: remove filler words (um, uh, like, you know), fix grammar, improve clarity, but keep the original meaning and tone. Return only the cleaned text, nothing else.' 
-            },
-            { role: 'user', content: transcript }
-          ]
+      // If OpenAI key exists, polish with GPT (optional)
+      if (state.apiKey) {
+        const polishResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${state.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: 'You are a professional editor. Clean up the transcribed text: remove filler words (um, uh, like, you know), fix grammar, improve clarity, but keep the original meaning and tone. Return only the cleaned text, nothing else.' },
+              { role: 'user', content: transcript }
+            ]
+          })
         })
-      })
 
-      const polishData = await polishResponse.json()
-      const polished = polishData.choices?.[0]?.message?.content || transcript
-
-      setState(prev => ({ ...prev, polishedText: polished, isProcessing: false }))
+        const polishData = await polishResponse.json()
+        const polished = polishData.choices?.[0]?.message?.content || transcript
+        setState(prev => ({ ...prev, polishedText: polished, isProcessing: false }))
+      } else {
+        // No API key, just use raw transcript
+        setState(prev => ({ ...prev, polishedText: transcript, isProcessing: false }))
+      }
     } catch (err) {
       console.error('Error processing audio:', err)
-      setState(prev => ({ ...prev, isProcessing: false, polishedText: 'Error processing audio. Please try again.' }))
+      setState(prev => ({ 
+        ...prev, 
+        isProcessing: false, 
+        polishedText: 'Error! Make sure Whisper server is running: python whisper_server.py'
+      }))
     }
-  }
-
-  // Create FormData for Whisper
-  const createFormData = (audioBase64: string): FormData => {
-    const formData = new FormData()
-    const blob = base64ToBlob(audioBase64, 'audio/webm')
-    formData.append('file', blob, 'recording.webm')
-    formData.append('model', 'whisper-1')
-    return formData
-  }
-
-  // Helper: base64 to Blob
-  const base64ToBlob = (base64: string, mimeType: string): Blob => {
-    const byteCharacters = atob(base64)
-    const byteNumbers = new Array(byteCharacters.length)
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i)
-    }
-    const byteArray = new Uint8Array(byteNumbers)
-    return new Blob([byteArray], { type: mimeType })
   }
 
   // Copy to clipboard
@@ -224,12 +194,14 @@ function App() {
         
         {state.polishedText ? (
           <>
-            <p style={{ fontSize: '0.75rem', color: '#22c55e', marginBottom: '4px' }}>✨ Polished:</p>
+            <p style={{ fontSize: '0.75rem', color: '#22c55e', marginBottom: '4px' }}>
+              {state.apiKey ? '✨ Polished (AI):' : '📝 Transcribed:'}
+            </p>
             <p className="output-text">{state.polishedText}</p>
           </>
         ) : (
           <p className="output-text output-placeholder">
-            {state.isProcessing ? 'AI is polishing your text...' : 'Your text will appear here'}
+            {state.isProcessing ? 'Processing...' : 'Your text will appear here'}
           </p>
         )}
 
@@ -257,16 +229,19 @@ function App() {
         <div className="settings">
           <h3>⚙️ Settings</h3>
           <div className="input-group">
-            <label>OpenAI API Key</label>
+            <label>OpenAI API Key (Optional - for AI polishing)</label>
             <input 
               type="password" 
               value={state.apiKey}
               onChange={(e) => saveApiKey(e.target.value)}
-              placeholder="sk-..."
+              placeholder="sk-... (leave empty for local only)"
             />
           </div>
+          <p style={{ fontSize: '0.75rem', color: '#a1a1aa', marginTop: '8px' }}>
+            💡 Without API key: uses local Whisper only (free!)
+          </p>
           <p className="shortcut-hint">
-            Tip: Press Ctrl+Shift+V (Windows) or Cmd+Shift+V (Mac) to start recording from anywhere!
+            Tip: Press Ctrl+Shift+V to start recording from anywhere!
           </p>
         </div>
       )}
