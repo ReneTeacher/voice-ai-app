@@ -62,28 +62,9 @@ npm run electron:dev
 - Vite
 - **Faster-Whisper** (本地運行，免費！)
 
-## Troubleshooting
+## Note
 
-**Error: "Whisper server not running"**
-→確保 `python whisper_server.py` 係running
-
-**First time slow?**
-→正常既，第一次會 download Whisper 模型 (約 $lt;500MB)
-
-## Files
-
-```
-voice-ai-app/
-├── src/
-│   ├── App.tsx          # React UI
-│   └── index.css        # Styles
-├── electron/
-│   ├── main.js          # Electron main
-│   └── preload.js       # Preload script
-├── whisper_server.py    # Local Whisper server
-├── package.json
-└── README.md
-```
+如果 Port 5000 被 AirPlay 佔用，個 App 會用 5001。
 
 ---
 Made with ❤️ for free voice AI!

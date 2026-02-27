@@ -94,7 +94,7 @@ function App() {
       const formData = new FormData()
       formData.append('audio', audioBlob, 'recording.webm')
 
-      const whisperResponse = await fetch('http://localhost:5000/transcribe', {
+      const whisperResponse = await fetch('http://localhost:5001/transcribe', {
         method: 'POST',
         body: formData
       })
