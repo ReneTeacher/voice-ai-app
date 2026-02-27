@@ -2,13 +2,13 @@
   "name": "voice-ai-app",
   "version": "1.0.0",
   "description": "AI Voice Dictation App - Typeless Clone",
-  "main": "dist-electron/main.js",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "build:electron": "npm run build && tsc -p tsconfig.electron.json",
+    "build": "vite build",
+    "build:electron": "echo 'Using JS directly - no build needed'",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "dist": "npm run build:electron && electron-builder"
+    "dist": "npm run build && electron-builder"
   },
   "keywords": ["voice", "ai", "dictation", "electron"],
   "author": "Teacher",
@@ -28,5 +28,20 @@
     "electron-builder": "^24.9.1",
     "concurrently": "^8.2.2",
     "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.voiceai.app",
+    "productName": "Voice AI",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.productivity"
+    }
   }
 }
